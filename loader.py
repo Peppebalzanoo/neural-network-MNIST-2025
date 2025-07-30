@@ -37,7 +37,7 @@ class DataLoader:
 
     def one_hot_encode(self, labels):
         num_classes = int(np.max(labels)) + 1
-        one_hot_labels = np.zeros((labels.size, num_classes))
+        one_hot_labels = np.zeros((labels.size, num_classes), dtype=int)
         idxs_of_labels = labels.astype(int)
         one_hot_labels[np.arange(labels.size), idxs_of_labels] = 1
         return one_hot_labels
@@ -74,35 +74,37 @@ class DataLoader:
 
     def create_stratified_k_folds(self, Y_train, k):
         """Create k stratified folds from the training set labels."""
-        # 0. Initialize k empty lists, one for each fold
+        # Initialize k empty lists, one for each fold
         fold_indices = [[] for _ in range(k)]
 
-        # 1. Convert labels from one-hot to single value (e.g. from [0,0,0,1..] to 3)
+        # Convert labels from one-hot to single value (e.g. from [0,0,0,1..] to 3)
         labels = np.argmax(Y_train, axis=1)
 
         num_classes = Y_train.shape[1]
-        # 2. For each class (from 0 to 9)...
+        # For each class (from 0 to 9)...
         for class_id in range(num_classes):
-            # 3. Find all indices of samples that belong to this class
+            # Find all indices of samples that belong to this class
             # np.where is the vectorized and fast way to do it.
             indices_for_class = np.where(labels == class_id)[0]
 
-            # 4. Randomly shuffle the indices of this class
+            # Randomly shuffle the indices of this class
             np.random.shuffle(indices_for_class)
 
-            # 5. Split the shuffled indices into k "chunks" (parts) that are almost equal
+            # Split the shuffled indices into k "chunks" (parts) that are almost equal
             class_chunks = np.array_split(indices_for_class, k)
 
-            # 6. Assign each chunk to a different fold
+            # Assign each chunk to a different fold
             for i in range(k):
                 # We use .extend() on a Python list, which is much more efficient
                 fold_indices[i].extend(class_chunks[i])
 
-        # 7. Convert the index lists to NumPy arrays and shuffle them one last time
+        # Convert the index lists to NumPy arrays and shuffle them one last time
         final_folds = []
         for i in range(k):
+            # Convert to NumPy array and shuffle
             fold_array = np.array(fold_indices[i], dtype=int)
             np.random.shuffle(fold_array)
+            # Append to the final list of folds
             final_folds.append(fold_array)
 
         return final_folds

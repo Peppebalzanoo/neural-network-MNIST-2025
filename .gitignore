@@ -1,2 +1,4 @@
 __pycache__
 venv
+MNIST/mnist_test.csv
+MNIST/mnist_train.csv

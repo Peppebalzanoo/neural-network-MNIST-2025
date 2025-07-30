@@ -72,56 +72,60 @@ class Network:
         """Perform forward propagation through the network."""
         for layer in range(0, self._depth):
             # print(f"Layer {layer}: newX.shape: {X.shape}")
-            Z = np.matmul(X, self._weights[layer].T) + self._biases[layer].T
-            X = self._act_functions[layer](Z)
+            R = np.matmul(X, self._weights[layer].T) + self._biases[layer].T
+            X = self._act_functions[layer](R)
         return X
 
     def _forward_prop_train(self, X) -> tuple:
         """Perform forward propagation during training."""
-        Z_act = [X]
-        Z_der = []
+        Y_act_values = [X]  # List of outputs for each layer using activation functions
+        Y_act_derivatives = []  # List of derivatives of activation functions for each layer
         for layer in range(0, self._depth):
-            Z = np.matmul(Z_act[layer], self._weights[layer].T) + self._biases[layer].T
-            Z_act.append(self._act_functions[layer](Z))
-            Z_der.append(self._act_functions[layer](Z, derivative=True))
-        return Z_act, Z_der
+            R = np.matmul(Y_act_values[layer], self._weights[layer].T) + self._biases[layer].T
+            Y_act_values.append(self._act_functions[layer](R))
+            curr_act_fun = self._act_functions[layer]
+            Y_act_derivatives.append(curr_act_fun(R, derivative=True))
+        return Y_act_values, Y_act_derivatives
 
-    def _back_propagation(self, X_train, Y_train, error_function):
+    def _back_propagation(self, X_train, Y_train, error_function, eta):
         """Train the network on the provided dataset."""
         # Step 1: Forward Step
-        Z_act, Z_der = self._forward_prop_train(X_train)
+        Y_act_values, Y_act_derivatives = self._forward_prop_train(X_train)
         # Step 2: Compute the error for each layer (delta values)
         delta_values = []
-        for layer in range(self._depth, 0, -1):
+        for layer in range(self._depth, 0, -1):  # Iterate from output layer to input layer
             if layer == self._depth:
                 # Calculate the error for the output layer
-                delta_k = error_function(Z_act[layer], Y_train, derivative=True)
+                delta_k = error_function(Y_act_values[layer], Y_train, derivative=True) * Y_act_derivatives[layer - 1]
+                # Append the delta for the output layer
                 delta_values.append(delta_k)
             else:
                 # Calculate the error for hidden layers
-                delta_h = np.matmul(delta_values[0], self._weights[layer]) * Z_der[layer - 1]
+                delta_h = np.matmul(delta_values[0], self._weights[layer]) * Y_act_derivatives[layer - 1]
+                # Append the delta for the hidden layer
                 delta_values.insert(0, delta_h)
 
         # Step 3: Calculate all partial derivatives (local rows)
         der_partials = []
         for layer in range(0, self._depth):
-            der_partial = np.matmul(delta_values[layer].T, Z_act[layer])
+            der_partial = np.matmul(delta_values[layer].T, Y_act_values[layer])
             der_partials.append(der_partial)
 
-        return der_partials, delta_values
+        # STEP 4: Update weights and biases
+        self._gradient_descent(der_partials, delta_values, eta)
 
     def _gradient_descent(self, der_partials, delta_values, eta):
         """Update weights and biases using gradient descent."""
         # Get the number of samples in the batch
         num_samples = delta_values[0].shape[0]
         for layer in range(0, self._depth):
-            # Update weights and biases
+            # Update weights and biases with normalization
             self._weights[layer] -= (eta / num_samples) * der_partials[layer]
             # Bias update: correctly calculated from deltas and averaged
             bias_gradient = np.sum(delta_values[layer], axis=0, keepdims=True).T
             self._biases[layer] -= (eta / num_samples) * bias_gradient
 
-    def fit(self, X_train, Y_train, X_valid, Y_valid, error_function, epoch_number=10, eta=0.1) -> None:
+    def fit(self, X_train, Y_train, X_valid, Y_valid, error_function, epoch_number=10, eta=0.1, patience=5) -> None:
         # Perform forward propagation and calculate the error
         Z_train = self.forward_propagation(X_train)
         error_train = error_function(Z_train, Y_train)
@@ -133,11 +137,14 @@ class Network:
         # Print initial training information
         self._print_train_info(Z_train, Y_train, Z_valid, Y_valid, error_train, error_valid, -1)
 
+        # Early stopping variables
+        best_valid_error = float("inf")
+        patience_counter = 0
         curr_epoca = 0
         while curr_epoca < epoch_number:
-            der_partials, delta_values = self._back_propagation(X_train, Y_train, error_function)
-            # STEP 4: Update weights and biases
-            self._gradient_descent(der_partials, delta_values, eta)
+            # Perform back propagation
+            self._back_propagation(X_train, Y_train, error_function, eta)
+
             # Perform forward propagation and calculate the error
             Z_train = self.forward_propagation(X_train)
             error_train = error_function(Z_train, Y_train)
@@ -150,6 +157,16 @@ class Network:
 
             curr_epoca += 1
 
+            # Early stopping check
+            if error_valid < best_valid_error:
+                best_valid_error = error_valid
+                patience_counter = 0
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    print(f"Early stopping at epoch {curr_epoca} due to no improvement in validation error.")
+                    break
+
     def get_info(self) -> None:
         """Print the architecture and parameters of the network."""
         print(f"\nNetwork Architecture: {self._input_neurons}  x {self._hidden_neurons} x {self._output_neurons}")
@@ -159,5 +176,5 @@ class Network:
 
     def _print_train_info(self, Z_train, Y_train, Z_valid, Y_valid, error_train, error_valid, curr_epoca):
         print(
-            f"Epoca: {curr_epoca}, Train error: {error_train}, Accuracy Train: {self.get_accuracy(Z_train, Y_train)}, Validation error: {error_valid}, Accuracy Validation: {self.get_accuracy(Z_valid, Y_valid)}"
+            f"Epoca: {curr_epoca}, Train error: {error_train:.15f}, Accuracy Train: {self.get_accuracy(Z_train, Y_train):.15f}, Validation error: {error_valid:.15f}, Accuracy Validation: {self.get_accuracy(Z_valid, Y_valid):.15f}"
         )
