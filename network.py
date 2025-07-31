@@ -58,12 +58,12 @@ class Network:
         new_net._act_functions = list(self._act_functions)
         return new_net
 
-    def get_accuracy(self, X, Y) -> float:
+    def get_accuracy(self, Z, Y) -> float:
         """Calculate the accuracy of the network."""
         # X are the network predictions, Y are the one-hot labels
         # Both have shape (number_samples, number_classes)
         total_labels = Y.shape[0]
-        predicted_labels = np.argmax(X, axis=1)
+        predicted_labels = np.argmax(Z, axis=1)
         true_labels = np.argmax(Y, axis=1)
         correct = np.sum(predicted_labels == true_labels)
         return correct / total_labels

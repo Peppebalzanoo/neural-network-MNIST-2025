@@ -43,15 +43,15 @@ class DataLoader:
         return one_hot_labels
 
     def get_train_test_data(self):
-        """Return the loaded dataset."""
+        """Return the loaded dataset: (X_train, Y_train, X_test, Y_test)."""
         if self._train_data is None or self._test_data is None:
             raise ValueError("Data not loaded. Please call _load_data() first.")
         if self._train_labels is None or self._test_labels is None:
             raise ValueError("Labels not loaded. Please check the dataset files.")
         return self._train_data, self._train_labels, self._test_data, self._test_labels
 
-    def split_train_data(self, train_ratio: float = 0.8):
-        """Split the training data into a smaller training set and validation set."""
+    def split_data(self, train_ratio: float = 0.8):
+        """Split the training data into training set and validation set."""
         if not (0 < train_ratio < 1):
             raise ValueError("train_ratio must be between 0 and 1.")
 
@@ -79,12 +79,11 @@ class DataLoader:
 
         # Convert labels from one-hot to single value (e.g. from [0,0,0,1..] to 3)
         labels = np.argmax(Y_train, axis=1)
-
+        # Get the number of classes
         num_classes = Y_train.shape[1]
-        # For each class (from 0 to 9)...
-        for class_id in range(num_classes):
+
+        for class_id in range(0, num_classes):
             # Find all indices of samples that belong to this class
-            # np.where is the vectorized and fast way to do it.
             indices_for_class = np.where(labels == class_id)[0]
 
             # Randomly shuffle the indices of this class
@@ -103,6 +102,7 @@ class DataLoader:
         for i in range(k):
             # Convert to NumPy array and shuffle
             fold_array = np.array(fold_indices[i], dtype=int)
+            # Shuffle the fold array to ensure randomness
             np.random.shuffle(fold_array)
             # Append to the final list of folds
             final_folds.append(fold_array)
